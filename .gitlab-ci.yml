@@ -1,0 +1,34 @@
+---
+default:
+    image: golang:1-trixie
+    interruptible: true
+
+stages:
+    - lint
+    - test
+    - publish
+
+lint:
+    stage: lint
+    image: golangci/golangci-lint:latest
+    script:
+        - golangci-lint fmt -d
+        - golangci-lint run
+
+test:
+    stage: test
+    script:
+        - go run github.com/bobg/mingo/cmd/mingo@latest -v -check -strict
+        - go test -fullpath -shuffle=on ./...
+
+publish:
+    stage: publish
+    image: registry.gitlab.com/gitlab-org/cli:latest
+    interruptible: false
+    rules:
+        - if: $CI_COMMIT_TAG
+    script:
+        - glab changelog generate -v $CI_COMMIT_TAG > ./description.md
+    release:
+        tag_name: $CI_COMMIT_TAG
+        description: ./description.md
