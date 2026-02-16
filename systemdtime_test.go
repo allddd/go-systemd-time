@@ -24,6 +24,7 @@
 package systemdtime_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -138,4 +139,12 @@ func BenchmarkParseTimespan(b *testing.B) {
 			}
 		})
 	}
+}
+
+func ExampleParseTimespan() {
+	ts := "2h30min40seconds"
+	d, _ := systemdtime.ParseTimespan(ts)
+	fmt.Printf("There are %.0f seconds in %q.\n", d.Seconds(), ts)
+	// Output:
+	// There are 9040 seconds in "2h30min40seconds".
 }
