@@ -21,7 +21,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Package systemdtime parses time values based on the systemd.time specification.
+// Package systemdtime parses time values based on the systemd time specification.
 // For full details, see the systemd.time(7) man page or visit:
 // https://www.freedesktop.org/software/systemd/man/latest/systemd.time.html
 package systemdtime
@@ -42,7 +42,7 @@ const (
 	Hour        = time.Hour
 	Day         = 24 * Hour
 	Week        = 7 * Day
-	Month       = time.Duration(30.44 * float64(Day))  // 30.44 days
+	Month       = Year / 12                            // 30.4375 days
 	Year        = time.Duration(365.25 * float64(Day)) // 365.25 days
 )
 
