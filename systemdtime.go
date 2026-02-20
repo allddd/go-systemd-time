@@ -46,6 +46,57 @@ const (
 	Year        = time.Duration(365.25 * float64(Day)) // 365.25 days
 )
 
+// readFrac reads a number from s starting at position pos and returns the number
+// (as nanoseconds), the position after the number, and any error.
+func readFrac(s string, pos int) (int, int, error) {
+	i := pos
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	if i == pos {
+		return 0, pos, fmt.Errorf("expected number in %q", s)
+	}
+	frac := s[pos:i]
+	if len(frac) > 9 { //nolint:mnd // 9 digits (nanosecond precision)
+		frac = frac[:9]
+	}
+	n, err := strconv.Atoi(frac)
+	if err != nil {
+		return 0, pos, fmt.Errorf("expected number, got %q in %q: %w", frac, s, err)
+	}
+	for j := len(frac); j < 9; j++ { // pad to nanosecond precision
+		n *= 10
+	}
+	return n, i, nil
+}
+
+// readNum reads a number from s starting at position pos and returns the number,
+// the position after the number, and any error.
+func readNum(s string, pos int) (int, int, error) {
+	i := pos
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	if i == pos {
+		return 0, pos, fmt.Errorf("expected number in %q", s)
+	}
+	n, err := strconv.Atoi(s[pos:i])
+	if err != nil {
+		return 0, pos, fmt.Errorf("expected number, got %q in %q: %w", s[pos:i], s, err)
+	}
+	return n, i, nil
+}
+
+// readWord reads all non-digit, non-space characters from s starting at position
+// pos and returns the string and the position after it.
+func readWord(s string, pos int) (string, int) {
+	i := pos
+	for i < len(s) && s[i] != ' ' && (s[i] < '0' || s[i] > '9') {
+		i++
+	}
+	return s[pos:i], i
+}
+
 // ParseTimespan parses a time span string and returns the duration.
 //
 // Time spans are sequences of numeric values with optional time units. Separating
@@ -63,7 +114,7 @@ const (
 //	hours, hour, hr, h
 //	days, day, d
 //	weeks, week, w
-//	months, month, M (defined as 30.44 days)
+//	months, month, M (defined as 30.4375 days)
 //	years, year, y (defined as 365.25 days)
 //
 // Examples for valid time spans:
@@ -78,7 +129,7 @@ const (
 //	60
 //
 // The function returns an error if the input is empty, contains invalid numbers,
-// unrecognized units, or malformed syntax (e.g. multiple decimal points).
+// or unrecognized units.
 func ParseTimespan(s string) (time.Duration, error) {
 	switch s {
 	case "":
@@ -87,8 +138,8 @@ func ParseTimespan(s string) (time.Duration, error) {
 		return 0, nil
 	}
 
-	var total time.Duration
-
+	var d time.Duration
+	foundAny := false
 	for i := 0; i < len(s); {
 		// skip spaces
 		for i < len(s) && s[i] == ' ' {
@@ -100,37 +151,24 @@ func ParseTimespan(s string) (time.Duration, error) {
 			break
 		}
 
-		// parse numbers
-		foundDot := false
-		foundNum := false
-		start := i
-		for i < len(s) && ((s[i] >= '0' && s[i] <= '9') || s[i] == '.') {
-			if s[i] == '.' {
-				if foundDot {
-					return 0, fmt.Errorf("expected single decimal point, got multiple at position %d in %q", i, s)
-				}
-				foundDot = true
-			} else {
-				foundNum = true
+		// read number
+		var num int
+		var err error
+		if s[i] >= '0' && s[i] <= '9' {
+			num, i, err = readNum(s, i)
+			if err != nil {
+				return 0, err
 			}
+		} else if s[i] != '.' {
+			return 0, fmt.Errorf("expected number, got %q in %q", string(s[i]), s)
+		}
+		nsec := 0
+		if i < len(s) && s[i] == '.' {
 			i++
-		}
-		if !foundNum {
-			return 0, fmt.Errorf("expected number, got %q at position %d in %q", string(s[start]), start, s)
-		}
-		var num float64
-		if foundDot { // ParseFloat can parse integers, but it's much slower than Atoi, hence the if-else
-			var err error
-			num, err = strconv.ParseFloat(s[start:i], 64)
+			nsec, i, err = readFrac(s, i)
 			if err != nil {
-				return 0, fmt.Errorf("expected valid number, got %q in %q: %w", s[start:i], s, err)
+				return 0, err
 			}
-		} else {
-			v, err := strconv.Atoi(s[start:i])
-			if err != nil {
-				return 0, fmt.Errorf("expected valid number, got %q in %q: %w", s[start:i], s, err)
-			}
-			num = float64(v)
 		}
 
 		// skip spaces again
@@ -138,17 +176,15 @@ func ParseTimespan(s string) (time.Duration, error) {
 			i++
 		}
 
-		// parse unit
+		// read unit
 		var unit time.Duration
-		start = i
-		for i < len(s) && s[i] != ' ' && (s[i] < '0' || s[i] > '9') {
-			i++
-		}
-		if start == i {
+		var unitStr string
+		unitStr, i = readWord(s, i)
+		if unitStr == "" {
 			unit = Second // no unit specified, default to seconds
 		} else {
 			// switch was ca. 20% faster than a map in my tests
-			switch s[start:i] {
+			switch unitStr {
 			case "ns", "nsec":
 				unit = Nanosecond
 			case "us", "µs", "μs", "usec": // 1st is the micro symbol (U+00B5), 2nd is the Greek letter mu (U+03BC)
@@ -170,12 +206,24 @@ func ParseTimespan(s string) (time.Duration, error) {
 			case "y", "year", "years":
 				unit = Year
 			default:
-				return 0, fmt.Errorf("expected valid unit, got %q in %q", s[start:i], s)
+				return 0, fmt.Errorf("expected unit, got %q in %q", unitStr, s)
 			}
 		}
 
-		total += time.Duration(num * float64(unit))
+		d += time.Duration(num) * unit
+		if nsec > 0 {
+			if unit >= Second {
+				d += time.Duration(nsec) * (unit / Second)
+			} else {
+				d += time.Duration(nsec) / (Second / unit)
+			}
+		}
+		foundAny = true
 	}
 
-	return total, nil
+	if !foundAny {
+		return 0, fmt.Errorf("expected time span, got %q", s)
+	}
+
+	return d, nil
 }
