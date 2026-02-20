@@ -58,7 +58,7 @@ func readFrac(s string, pos int) (int, int, error) {
 		return 0, pos, fmt.Errorf("expected number in %q", s)
 	}
 	frac := s[pos:i]
-	if len(frac) > 9 { //nolint:mnd // 9 digits (nanosecond precision)
+	if len(frac) > 9 { // 9 digits (nanosecond precision)
 		frac = frac[:9]
 	}
 	n, err := strconv.Atoi(frac)
@@ -111,11 +111,11 @@ func handleDate(s string, pos int) (int, int, int, int, bool, error) {
 	if err != nil {
 		return 0, 0, 0, pos, false, err
 	}
-	fullYear := year >= 100 //nolint:mnd // 100 is threshold for 2-digit year
+	fullYear := year >= 100 // 100 is threshold for 2-digit year
 	if !fullYear {
 		// 0-68 is 2000-2068, 69-99 is 1969-1999
 		// systemd does the same thing but rejects 69 and 70 for whatever reason
-		if year <= 68 { //nolint:mnd
+		if year <= 68 {
 			year += 2000
 		} else {
 			year += 1900
@@ -211,7 +211,7 @@ func handleTime(s string, pos int) (int, int, int, int, int, error) {
 	if err != nil {
 		return 0, 0, 0, 0, pos, err
 	}
-	if hour > 23 { //nolint:mnd // 23 is max valid hour
+	if hour > 23 { // 23 is max valid hour
 		return 0, 0, 0, 0, pos, fmt.Errorf("expected hour in range 0-23, got %d in %q", hour, s)
 	}
 
@@ -222,7 +222,7 @@ func handleTime(s string, pos int) (int, int, int, int, int, error) {
 		if err != nil {
 			return 0, 0, 0, 0, pos, err
 		}
-		if minute > 59 { //nolint:mnd // 59 is max valid minute
+		if minute > 59 { // 59 is max valid minute
 			return 0, 0, 0, 0, pos, fmt.Errorf("expected minute in range 0-59, got %d in %q", minute, s)
 		}
 
@@ -233,7 +233,7 @@ func handleTime(s string, pos int) (int, int, int, int, int, error) {
 			if err != nil {
 				return 0, 0, 0, 0, pos, err
 			}
-			if second > 59 { //nolint:mnd // 59 is max valid second
+			if second > 59 { // 59 is max valid second
 				return 0, 0, 0, 0, pos, fmt.Errorf("expected second in range 0-59, got %d in %q", second, s)
 			}
 
@@ -266,7 +266,7 @@ func handleTimezone(s string, pos int) (*time.Location, int, error) {
 	case "Z":
 		return time.UTC, i + 1, nil // 1 is length of "Z"
 	case "UTC":
-		return time.UTC, i + 3, nil //nolint:mnd // 3 is length of "UTC"
+		return time.UTC, i + 3, nil // 3 is length of "UTC"
 	}
 
 	// check for offset format: +05:30, +0530, +05, -05:30, etc.
@@ -291,7 +291,7 @@ func handleTimezone(s string, pos int) (*time.Location, int, error) {
 		digits := i - numStart
 
 		switch digits {
-		case 2: //nolint:mnd // 2 is the digit count for HH format
+		case 2: // 2 is the digit count for HH format
 			hours := num
 			if i < len(s) && s[i] == ':' {
 				i++
@@ -300,15 +300,15 @@ func handleTimezone(s string, pos int) (*time.Location, int, error) {
 				if err != nil {
 					return nil, pos, err
 				}
-				if i-minsStart != 2 { //nolint:mnd // 2 is the required digit count for MM
+				if i-minsStart != 2 { // 2 is the required digit count for MM
 					return nil, pos, fmt.Errorf("expected 2-digit offset, got %d digits in %q", i-minsStart, s)
 				}
 				minutes := num
-				if minutes >= 60 { //nolint:mnd
+				if minutes >= 60 {
 					return nil, pos, fmt.Errorf("timezone offset minutes out of range (0-59), got %d in %q", minutes, s)
 				}
-				offsetSecs := hours*3600 + minutes*60 //nolint:mnd
-				if offsetSecs > 86400 {               //nolint:mnd // 24h is the maximum allowed offset
+				offsetSecs := hours*3600 + minutes*60
+				if offsetSecs > 86400 { // 24h is the maximum allowed offset
 					return nil, pos, fmt.Errorf("timezone offset out of range (max 24h), got %d seconds in %q", offsetSecs, s)
 				}
 				return time.FixedZone("", sign*offsetSecs), i, nil
@@ -316,14 +316,14 @@ func handleTimezone(s string, pos int) (*time.Location, int, error) {
 			if hours > 24 {
 				return nil, pos, fmt.Errorf("timezone offset out of range (max 24h), got %dh in %q", hours, s)
 			}
-			return time.FixedZone("", sign*hours*3600), i, nil //nolint:mnd // 3600 seconds per hour
-		case 4: //nolint:mnd // 4 is the digit count for HHMM format
-			hours, minutes := num/100, num%100 //nolint:mnd
-			if minutes >= 60 {                 //nolint:mnd
+			return time.FixedZone("", sign*hours*3600), i, nil // 3600 seconds per hour
+		case 4: // 4 is the digit count for HHMM format
+			hours, minutes := num/100, num%100
+			if minutes >= 60 {
 				return nil, pos, fmt.Errorf("timezone offset minutes out of range (0-59), got %d in %q", minutes, s)
 			}
-			offsetSecs := hours*3600 + minutes*60 //nolint:mnd
-			if offsetSecs > 86400 {               //nolint:mnd
+			offsetSecs := hours*3600 + minutes*60
+			if offsetSecs > 86400 {
 				return nil, pos, fmt.Errorf("timezone offset out of range (max 24h), got %d seconds in %q", offsetSecs, s)
 			}
 			return time.FixedZone("", sign*offsetSecs), i, nil

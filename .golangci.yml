@@ -29,6 +29,8 @@ linters:
         - godox
         # same as cyclop
         - maintidx
+        # too annoying
+        - mnd
         # same as cyclop
         - nestif
         # styling/formatting with no impact on functionality
