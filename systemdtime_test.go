@@ -31,6 +31,13 @@ import (
 	systemdtime "gitlab.com/allddd/go-systemd-time"
 )
 
+var (
+	tzLondon, _  = time.LoadLocation("Europe/London")
+	tzNewYork, _ = time.LoadLocation("America/New_York")
+	tzSydney, _  = time.LoadLocation("Australia/Sydney")
+	tzTokyo, _   = time.LoadLocation("Asia/Tokyo")
+)
+
 func TestParseTimespan(t *testing.T) {
 	cases := []struct {
 		input     string
@@ -161,4 +168,216 @@ func ExampleParseTimespan() {
 	fmt.Printf("There are %.0f seconds in %q.\n", d.Seconds(), ts)
 	// Output:
 	// There are 9040 seconds in "2h30min40seconds".
+}
+
+func TestParseTimestamp(t *testing.T) {
+	now := time.Date(2009, 11, 10, 23, 0, 0, 0, time.UTC)
+	cases := []struct {
+		input     string
+		expect    time.Time
+		expectErr bool
+	}{
+		// token
+		{"now", now, false},
+		{"today", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"yesterday", time.Date(2009, 11, 9, 0, 0, 0, 0, time.UTC), false},
+		{"tomorrow", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"today UTC", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"yesterday UTC", time.Date(2009, 11, 9, 0, 0, 0, 0, time.UTC), false},
+		{"tomorrow UTC", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{" now", time.Time{}, true},
+		{"now ", time.Time{}, true},
+		{"now UTC", time.Time{}, true},
+		{"today tomorrow", time.Time{}, true},
+		{"tomorrow today", time.Time{}, true},
+		// date
+		{"2009-11-10", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"09-11-10", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"00-01-01", time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		{"68-01-01", time.Date(2068, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		{"69-01-01", time.Date(1969, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		{"99-12-31", time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC), false},
+		{"11-23", time.Time{}, true},
+		{"23", time.Time{}, true},
+		{"2009-13-01", time.Time{}, true},
+		{"2009-00-01", time.Time{}, true},
+		{"2009-01-00", time.Time{}, true},
+		{"2009-11-32", time.Time{}, true},
+		// time
+		{"18:15:22", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"18:15", time.Date(2009, 11, 10, 18, 15, 0, 0, time.UTC), false},
+		{"11:12", time.Date(2009, 11, 10, 11, 12, 0, 0, time.UTC), false},
+		{"0:0:0", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"0:0", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"25:00:00", time.Time{}, true},
+		{"18:60:00", time.Time{}, true},
+		{"18:60", time.Time{}, true},
+		// date&time
+		{"2009-11-10 18:15:22", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"2009-11-10 18:15", time.Date(2009, 11, 10, 18, 15, 0, 0, time.UTC), false},
+		{"09-11-10 18:15:22", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"2009-11-10 25:00:00", time.Time{}, true},
+		{"2009-11-10 18:60:00", time.Time{}, true},
+		{"2009-11-10 18:15:60", time.Time{}, true},
+		{"2009-11-10 18 :15:22", time.Time{}, true},
+		{"2009-11-10 2009-11-10", time.Time{}, true},
+		{"18:15:22 18:15:22", time.Time{}, true},
+		// weekday
+		{"Mon 2009-11-09", time.Date(2009, 11, 9, 0, 0, 0, 0, time.UTC), false},
+		{"Tue 2009-11-10", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"Wed 2009-11-11", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"Thu 2009-11-12", time.Date(2009, 11, 12, 0, 0, 0, 0, time.UTC), false},
+		{"Fri 2009-11-13", time.Date(2009, 11, 13, 0, 0, 0, 0, time.UTC), false},
+		{"Sat 2009-11-14", time.Date(2009, 11, 14, 0, 0, 0, 0, time.UTC), false},
+		{"Sun 2009-11-15", time.Date(2009, 11, 15, 0, 0, 0, 0, time.UTC), false},
+		{"Monday 2009-11-09", time.Date(2009, 11, 9, 0, 0, 0, 0, time.UTC), false},
+		{"Tuesday 2009-11-10", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"Wednesday 2009-11-11", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"Thursday 2009-11-12", time.Date(2009, 11, 12, 0, 0, 0, 0, time.UTC), false},
+		{"Tuesday 2009-11-10 18:15:22", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"Saturday 2009-11-14", time.Date(2009, 11, 14, 0, 0, 0, 0, time.UTC), false},
+		{"Sunday 2009-11-15", time.Date(2009, 11, 15, 0, 0, 0, 0, time.UTC), false},
+		{"tue 2009-11-10 18:15:22", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"TUE 2009-11-10 18:15:22", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"Tue 2009-11-10 11:12:13", time.Date(2009, 11, 10, 11, 12, 13, 0, time.UTC), false},
+		{"Tue 2009-11-10 18:15:22", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"Tue 2009-11-10 UTC", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"Mon 2009-11-10 18:15:22", time.Time{}, true},
+		{"Thursday 2009-11-10", time.Time{}, true},
+		{"Friday", time.Time{}, true},
+		{"Fri 18:15:22", time.Time{}, true},
+		{"Tue Tue 2009-11-10", time.Time{}, true},
+		// fractional
+		{"2009-11-10 18:15:22.5", time.Date(2009, 11, 10, 18, 15, 22, 500000000, time.UTC), false},
+		{"2009-11-10 18:15:22.123456", time.Date(2009, 11, 10, 18, 15, 22, 123456000, time.UTC), false},
+		{"2009-11-10 18:15:22.5 UTC", time.Date(2009, 11, 10, 18, 15, 22, 500000000, time.UTC), false},
+		{"2009-11-10 18:15:22.5Z", time.Date(2009, 11, 10, 18, 15, 22, 500000000, time.UTC), false},
+		{"2009-11-10 18:15:22.5+05:30", time.Date(2009, 11, 10, 18, 15, 22, 500000000, time.FixedZone("", 5*3600+30*60)), false},
+		{"18:15:22.5 UTC", time.Date(2009, 11, 10, 18, 15, 22, 500000000, time.UTC), false},
+		{"18:15:22.5Z", time.Date(2009, 11, 10, 18, 15, 22, 500000000, time.UTC), false},
+		{"Tue 2009-11-10 18:15:22.5", time.Date(2009, 11, 10, 18, 15, 22, 500000000, time.UTC), false},
+		{"2009-11-10 18:15:22.", time.Time{}, true},
+		// timezone
+		{"2009-11-10 UTC", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"2009-11-10 +01:00", time.Date(2009, 11, 10, 0, 0, 0, 0, time.FixedZone("", 3600)), false},
+		{"18:15:22 UTC", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"11:12 UTC", time.Date(2009, 11, 10, 11, 12, 0, 0, time.UTC), false},
+		{"18:15:22 +05:30", time.Date(2009, 11, 10, 18, 15, 22, 0, time.FixedZone("", 5*3600+30*60)), false},
+		{"18:15:22Z", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"2009-11-10 18:15:22 UTC", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"2009-11-10 18:15:22 Z", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"2009-11-10 18:15:22+05:30", time.Date(2009, 11, 10, 18, 15, 22, 0, time.FixedZone("", 5*3600+30*60)), false},
+		{"2009-11-10 18:15:22-05:00", time.Date(2009, 11, 10, 18, 15, 22, 0, time.FixedZone("", -5*3600)), false},
+		{"2009-11-10 18:15:22 +05", time.Date(2009, 11, 10, 18, 15, 22, 0, time.FixedZone("", 5*3600)), false},
+		{"2009-11-10 18:15:22 -05", time.Date(2009, 11, 10, 18, 15, 22, 0, time.FixedZone("", -5*3600)), false},
+		{"2009-11-10 18:15:22 +0530", time.Date(2009, 11, 10, 18, 15, 22, 0, time.FixedZone("", 5*3600+30*60)), false},
+		{"2009-11-10 18:15:22 -0530", time.Date(2009, 11, 10, 18, 15, 22, 0, time.FixedZone("", -5*3600-30*60)), false},
+		{"2009-11-10 18:15:22 America/New_York", time.Date(2009, 11, 10, 18, 15, 22, 0, tzNewYork), false},
+		{"2009-11-10 18:15:22 Europe/London", time.Date(2009, 11, 10, 18, 15, 22, 0, tzLondon), false},
+		{"2009-11-10 18:15:22 Asia/Tokyo", time.Date(2009, 11, 10, 18, 15, 22, 0, tzTokyo), false},
+		{"2009-11-10 18:15:22 Australia/Sydney", time.Date(2009, 11, 10, 18, 15, 22, 0, tzSydney), false},
+		{"2009-11-10 22:02:15Z", time.Date(2009, 11, 10, 22, 2, 15, 0, time.UTC), false},
+		{"2009-11-10Z", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"2009-11-10+01:00", time.Date(2009, 11, 10, 0, 0, 0, 0, time.FixedZone("", 3600)), false},
+		{"Tue 2009-11-10Z", time.Date(2009, 11, 10, 0, 0, 0, 0, time.UTC), false},
+		{"Tue 2009-11-10+01:00", time.Date(2009, 11, 10, 0, 0, 0, 0, time.FixedZone("", 3600)), false},
+		{"2009-11-10 18:15:22 +05:60", time.Time{}, true},
+		{"2009-11-10 18:15:22 +99:00", time.Time{}, true},
+		{"2009-11-10 18:15:22 Not/TZ", time.Time{}, true},
+		// rfc3339
+		{"2009-11-10T23:02:15", time.Date(2009, 11, 10, 23, 2, 15, 0, time.UTC), false},
+		{"2009-11-10T23:02:15+01:00", time.Date(2009, 11, 10, 23, 2, 15, 0, time.FixedZone("", 3600)), false},
+		{"2009-11-10T22:02:15Z", time.Date(2009, 11, 10, 22, 2, 15, 0, time.UTC), false},
+		{"2009-11-10T11:12+02:00", time.Date(2009, 11, 10, 11, 12, 0, 0, time.FixedZone("", 2*3600)), false},
+		{"2009-11-10T11:12:13Z", time.Date(2009, 11, 10, 11, 12, 13, 0, time.UTC), false},
+		{"2009-11-10T18:15:22+00:00", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"2009-11-10T18:15:22-05:30", time.Date(2009, 11, 10, 18, 15, 22, 0, time.FixedZone("", -5*3600-30*60)), false},
+		{"2009-11-10T11:12 UTC", time.Date(2009, 11, 10, 11, 12, 0, 0, time.UTC), false},
+		{"2009-11-10T23:02:15 UTC", time.Date(2009, 11, 10, 23, 2, 15, 0, time.UTC), false},
+		{"2009-11-10T18:15:22.654321+01:00", time.Date(2009, 11, 10, 18, 15, 22, 654321000, time.FixedZone("", 3600)), false},
+		{"Tue 2009-11-10T11:12:13+01:00", time.Date(2009, 11, 10, 11, 12, 13, 0, time.FixedZone("", 3600)), false},
+		{"Tue 2009-11-10T18:15:22Z", time.Date(2009, 11, 10, 18, 15, 22, 0, time.UTC), false},
+		{"Tue 2009-11-10T11:12:13.5Z", time.Date(2009, 11, 10, 11, 12, 13, 500000000, time.UTC), false},
+		{"Tue 2009-11-10T11:12:13.654321+01:00", time.Date(2009, 11, 10, 11, 12, 13, 654321000, time.FixedZone("", 3600)), false},
+		{"09-11-10T18:15:22", time.Time{}, true},
+		{"09-11-10T18:15:22Z", time.Time{}, true},
+		// relative
+		{"+3h30min", time.Date(2009, 11, 11, 2, 30, 0, 0, time.UTC), false},
+		{"-5s", time.Date(2009, 11, 10, 22, 59, 55, 0, time.UTC), false},
+		{"11min ago", time.Date(2009, 11, 10, 22, 49, 0, 0, time.UTC), false},
+		{"1h left", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"+", time.Time{}, true},
+		{"-", time.Time{}, true},
+		{"-abc", time.Time{}, true},
+		{"+abc", time.Time{}, true},
+		{"abc ago", time.Time{}, true},
+		{"abc left", time.Time{}, true},
+		{"+5s -5s", time.Time{}, true},
+		{"+5s UTC", time.Time{}, true},
+		// unix
+		{"@1395716396", time.Unix(1395716396, 0), false},
+		{"@1395716396.11111", time.Unix(1395716396, 111110000), false},
+		{"@1395716396.654321", time.Unix(1395716396, 654321000), false},
+		{"@0", time.Unix(0, 0), false},
+		{"@0.5", time.Unix(0, 500000000), false},
+		{" @1395716396", time.Time{}, true},
+		{"  @0", time.Time{}, true},
+		{"@", time.Time{}, true},
+		{"@abc", time.Time{}, true},
+		{"@1234 @5678", time.Time{}, true},
+		{"@1.", time.Time{}, true},
+		{"@1.5abc", time.Time{}, true},
+		// error
+		{"", time.Time{}, true},
+		{"invalid", time.Time{}, true},
+	}
+	for _, tc := range cases {
+		got, err := systemdtime.ParseTimestamp(tc.input, now)
+		if tc.expectErr {
+			if err == nil {
+				t.Errorf("%q: expected error, got nil", tc.input)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", tc.input, err)
+			continue
+		}
+		if !got.Equal(tc.expect) {
+			t.Errorf("%q: expected %v, got %v", tc.input, tc.expect, got)
+		}
+	}
+}
+
+func BenchmarkParseTimestamp(b *testing.B) {
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"token", "today"},
+		{"date", "2009-11-10"},
+		{"time", "18:15:22"},
+		{"datetime", "2009-11-10 18:15:22"},
+		{"weekday", "Tue 2009-11-10 18:15:22"},
+		{"fractional", "2009-11-10 18:15:22.654321"},
+		{"timezone", "2009-11-10 18:15:22 America/New_York"},
+		{"rfc3339", "2009-11-10T18:15:22+01:00"},
+		{"relative", "+3h30min"},
+		{"unix", "@1395716396"},
+	}
+	for _, bc := range cases {
+		b.Run(bc.name, func(b *testing.B) {
+			for b.Loop() {
+				systemdtime.ParseTimestamp(bc.input)
+			}
+		})
+	}
+}
+
+func ExampleParseTimestamp() {
+	ts := "2009-11-10 23:00:00 UTC"
+	t, _ := systemdtime.ParseTimestamp(ts)
+	fmt.Printf("%q is a %s.\n", ts, t.Weekday())
+	// Output:
+	// "2009-11-10 23:00:00 UTC" is a Tuesday.
 }
