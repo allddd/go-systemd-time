@@ -606,6 +606,18 @@ func ParseTimestamp(s string, now ...time.Time) (time.Time, error) {
 
 	// relative
 	switch {
+	case c == '-':
+		d, err := ParseTimespan(s[1:])
+		if err != nil {
+			return time.Time{}, err
+		}
+		return ref.Add(-d), nil
+	case c == '+':
+		d, err := ParseTimespan(s[1:])
+		if err != nil {
+			return time.Time{}, err
+		}
+		return ref.Add(d), nil
 	case strings.HasSuffix(s, " ago"):
 		d, err := ParseTimespan(s[:len(s)-4])
 		if err != nil {
@@ -618,20 +630,6 @@ func ParseTimestamp(s string, now ...time.Time) (time.Time, error) {
 			return time.Time{}, err
 		}
 		return ref.Add(d), nil
-	}
-	if c == '+' {
-		d, err := ParseTimespan(s[1:])
-		if err != nil {
-			return time.Time{}, err
-		}
-		return ref.Add(d), nil
-	}
-	if c == '-' {
-		d, err := ParseTimespan(s[1:])
-		if err != nil {
-			return time.Time{}, err
-		}
-		return ref.Add(-d), nil
 	}
 
 	// starts with letter (special token or weekday)
