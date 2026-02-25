@@ -18,8 +18,8 @@ lint:
 test:
     stage: test
     script:
-        - go run github.com/bobg/mingo/cmd/mingo@latest -v -check -strict
         - go test -fullpath -shuffle=on ./...
+        - go run github.com/bobg/mingo/cmd/mingo@latest -v -check -strict
 
 publish:
     stage: publish
