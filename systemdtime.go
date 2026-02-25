@@ -187,7 +187,7 @@ func handleToken(s string, now time.Time) (time.Time, bool, error) {
 				return time.Time{}, true, err
 			}
 			if i < len(s) {
-				return time.Time{}, true, fmt.Errorf("expected end of input after timezone, got %q in %q", s[i:], s)
+				return time.Time{}, true, fmt.Errorf("expected end of input, got %q in %q", s[i:], s)
 			}
 		}
 	}
@@ -339,10 +339,10 @@ func handleTimezone(s string, pos int) (*time.Location, int, error) {
 	if i == pos {
 		return nil, pos, fmt.Errorf("expected timezone, got %q", s)
 	}
-	tzName := s[pos:i]
-	loc, err := time.LoadLocation(tzName)
+	tz := s[pos:i]
+	loc, err := time.LoadLocation(tz)
 	if err != nil {
-		return nil, pos, fmt.Errorf("expected timezone, got %q in %q: %w", tzName, s, err)
+		return nil, pos, fmt.Errorf("expected timezone, got %q in %q: %w", tz, s, err)
 	}
 
 	return loc, i, nil
@@ -428,9 +428,6 @@ func handleUnix(s string) (time.Time, error) {
 //	300ms20s 5day
 //	1.5h
 //	60
-//
-// The function returns an error if the input is empty, contains invalid numbers,
-// or unrecognized units.
 func ParseTimespan(s string) (time.Duration, error) {
 	switch s {
 	case "":
@@ -534,8 +531,8 @@ func ParseTimespan(s string) (time.Duration, error) {
 // Timestamps consist of optional weekday, date, time, and timezone. Fields can be
 // omitted. Dates are specified as YYYY-MM-DD or YY-MM-DD (0-68 is 2000-2068, 69-99
 // is 1969-1999). Times are specified as HH:MM:SS or HH:MM (seconds default to 0).
-// The space between date and time can be replaced with "T" (RFC 3339 / ISO 8601),
-// but only when the year is 4 digits.
+// The space between date and time can be replaced with "T" (RFC 3339), but only
+// when the year is 4 digits.
 //
 // The timezone defaults to the current timezone if not specified. It may be given
 // after a space as: "UTC", an IANA timezone database entry (e.g. "Asia/Tokyo"), or
@@ -546,8 +543,8 @@ func ParseTimespan(s string) (time.Duration, error) {
 // English form (case-insensitive). If specified, the weekday must match the date.
 //
 // If the date is omitted, it defaults to today. If the time is omitted, it defaults
-// to 00:00:00. Fractional seconds can be specified. The seconds field can also be
-// omitted, defaulting to 0.
+// to 00:00:00. Fractional seconds can be specified. Seconds can also be omitted,
+// defaulting to 0.
 //
 // Special tokens "now", "today", "yesterday", and "tomorrow" may be used. "now"
 // refers to the current time. "today", "yesterday", and "tomorrow" refer to 00:00:00
@@ -703,7 +700,7 @@ func ParseTimestamp(s string, now ...time.Time) (time.Time, error) {
 
 		// try to parse time (if present)
 		if i < len(s) && (s[i] >= '0' && s[i] <= '9') {
-			// if no date was parsed, time must have a colon
+			// if no date was parsed, there must be a colon
 			if !foundDash && !foundColon {
 				return time.Time{}, fmt.Errorf("expected ':' in time-only format, got %q", s)
 			}
@@ -748,7 +745,7 @@ func ParseTimestamp(s string, now ...time.Time) (time.Time, error) {
 		// validate weekday if it was specified
 		if foundWeekday && t.Weekday() != expectedWeekday {
 			return time.Time{}, fmt.Errorf("expected weekday %s for %s, got %s in %q",
-				expectedWeekday, t.Format("2006-01-02"), t.Weekday(), s)
+				expectedWeekday, t.Format("2009-11-10"), t.Weekday(), s)
 		}
 
 		return t, nil
