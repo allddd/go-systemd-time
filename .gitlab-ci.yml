@@ -4,22 +4,21 @@ default:
     interruptible: true
 
 stages:
-    - lint
-    - test
+    - check
     - publish
 
 lint:
-    stage: lint
+    stage: check
     image: golangci/golangci-lint:latest
     script:
         - golangci-lint fmt -d
         - golangci-lint run
+        - go run github.com/bobg/mingo/cmd/mingo@latest -v -check -strict
 
 test:
-    stage: test
+    stage: check
     script:
         - go test -fullpath -shuffle=on ./...
-        - go run github.com/bobg/mingo/cmd/mingo@latest -v -check -strict
 
 publish:
     stage: publish
