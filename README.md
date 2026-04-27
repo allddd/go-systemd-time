@@ -75,4 +75,6 @@ func main() {
 }
 ```
 
+## Copyright
+
 This project is licensed under the BSD 2-Clause License. See [LICENSE](./LICENSE) for more details.
