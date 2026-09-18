@@ -247,6 +247,8 @@ func TestParseTimestamp(t *testing.T) {
 		{"Friday", time.Time{}, true},
 		{"Fri 18:15:22", time.Time{}, true},
 		{"Tue Tue 2009-11-10", time.Time{}, true},
+		{"Tue,2009-11-10", time.Time{}, true},
+		{"Tue-2009-11-10", time.Time{}, true},
 		// fractional
 		{"2009-11-10 18:15:22.5", time.Date(2009, 11, 10, 18, 15, 22, 500000000, time.UTC), false},
 		{"2009-11-10 18:15:22.123456", time.Date(2009, 11, 10, 18, 15, 22, 123456000, time.UTC), false},
@@ -380,4 +382,300 @@ func ExampleParseTimestamp() {
 	fmt.Printf("%q is a %s.\n", ts, t.Weekday())
 	// Output:
 	// "2009-11-10 23:00:00 UTC" is a Tuesday.
+}
+
+func TestParseCalendarEvent(t *testing.T) {
+	cases := []struct {
+		input     string
+		expectErr bool
+	}{
+		// keyword
+		{"minutely", false},
+		{"hourly", false},
+		{"daily", false},
+		{"monthly", false},
+		{"weekly", false},
+		{"yearly", false},
+		{"annually", false},
+		{"quarterly", false},
+		{"semiannually", false},
+		{" daily", true},
+		{"daily extra stuff", true},
+		{"daily UTC extra", true},
+		// date
+		{"*-*-*", false},
+		{"*-*-01", false},
+		{"*-01-01", false},
+		{"2003-03-05", false},
+		{"*-*", false},
+		{"03-05", false},
+		{"*-*-01,15", false},
+		{"*-1/2-1,3", false},
+		{"2003-02..04-05", false},
+		{"2020..2025-*-*", false},
+		{"12-*-*", false},
+		{"1970-01-01", false},
+		{"2199-12-31", false},
+		{"*", true},
+		{"1969-12-31", true},
+		{"69-01-01", true},
+		{"2200-01-01", true},
+		{"*-,-*", true},
+		{"1,-01-01", true},
+		{"*-13-01", true},
+		{"*-00-01", true},
+		{"*-*-00", true},
+		{"*-*-32", true},
+		{"13-01", true},
+		{"10-32", true},
+		// time
+		{"08:05:40", false},
+		{"05:40", false},
+		{"0:0:0", false},
+		{"*:*:*", false},
+		{"*:*:00", false},
+		{"*:00:00", false},
+		{"*:2/3", false},
+		{"*:0/30", false},
+		{"*:*:00/5", false},
+		{"*:0/15:00", false},
+		{"12,14,13,12:20,10,30", false},
+		{"12..14:10,20,30", false},
+		{"05:", true},
+		{"12..:00", true},
+		{"12..10:00", true},
+		{"*:0/:00", true},
+		// date&time
+		{"*-*-* 00:00:00", false},
+		{"*-*-* *:*:00", false},
+		{"*-*-* *:00:00", false},
+		{"*-*-7 0:0:0", false},
+		{"2003-03-05 05:40", false},
+		{"2003-03-05 05:40:00", false},
+		{"*-*-* 24:00:00", true},
+		{"*-*-* 23:60:00", true},
+		{"*-*-* 23:59:60", true},
+		{"*-*-* *:*:00/0", true},
+		{"2009-11-10T18:15:22", true},
+		{"  *-*-* 00:00:00", true},
+		// weekday
+		{"Mon", false},
+		{"Monday", false},
+		{"tuesday", false},
+		{"WEDNESDAY", false},
+		{"Mon,", false},
+		{"Wed,", false},
+		{"Mon,Fri", false},
+		{"MONDAY,friday", false},
+		{"Mon..Wed", false},
+		{"Mon..Sun", false},
+		{"Mon..Wed,Fri", false},
+		{"Wed..Wed,Wed", false},
+		{"Sat,Thu,Mon..Wed,Sat..Sun", false},
+		{"Wed *-1", false},
+		{"Wed *-1,3", false},
+		{"Wed, 17:48", false},
+		{"Mon,Wed,Fri 17:48", false},
+		{"monday *-12-* 17:00", false},
+		{"Mon,Sun 12-*-* 2,1:23", false},
+		{"Mon,Fri *-*-3,1,2 *:30:45", false},
+		{"mon,fri *-1/2-1,3 *:30:45", false},
+		{"Thu,Fri 2012-*-1,5 11:12:13", false},
+		{"Wed..Sat,Tue 12-10-15 1:2:3", false},
+		{"Mon..", true},
+		{"Fri..Mon", true},
+		{"Mon..Wed..Fri", true},
+		{"Mon..Sat..Sun", true},
+		// last day
+		{"*-*~01", false},
+		{"*-02~03", false},
+		{"*-05~07/1", false},
+		{"*-*~1,5", false},
+		{"*-*~1..3", false},
+		{"*-*~3/2", false},
+		{"*-*~28", false},
+		{"*-*~*", true},
+		{"*-*~0 00:00:00", true},
+		{"*-*~29 00:00:00", true},
+		{"*-*~32 00:00:00", true},
+		{"*-*~5..2", true},
+		// fractional
+		{"05:40:23.420000", false},
+		{"05:40:23.4200004/3.1700005", false},
+		{"1.5-01", true},
+		{"1.5:00", true},
+		// timezone
+		{"daily UTC", false},
+		{"hourly Europe/London", false},
+		{"weekly Pacific/Auckland", false},
+		{"minutely +05:30", false},
+		{"2003-03-05 05:40 UTC", false},
+		{"2003-03-05 05:40 -0500", false},
+		{"*-*-* 00:00:00 UTC", false},
+		{"*-*-* 00:00:00 Asia/Tokyo", false},
+		{"*-*-* 12:00:00 +05:30", false},
+		{"*-*-* 00:00:00 Not/TZ", true},
+		{"*-*-* 00:00:00 extra", true},
+		{"*-*-* 00:00:00 UTC extra", true},
+		// error
+		{"", true},
+		{"invalid", true},
+	}
+	for _, tc := range cases {
+		_, err := systemdtime.ParseCalendarEvent(tc.input)
+		if tc.expectErr {
+			if err == nil {
+				t.Errorf("%q: expected error, got nil", tc.input)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", tc.input, err)
+		}
+	}
+}
+
+func BenchmarkParseCalendarEvent(b *testing.B) {
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"keyword", "daily"},
+		{"date", "2003-03-05"},
+		{"time", "08:05:40"},
+		{"datetime", "*-*-* 00:00:00"},
+		{"weekday", "Mon,Fri"},
+		{"lastday", "*-*~1 00:00:00"},
+		{"fractional", "05:40:23.4200004/3.1700005"},
+		{"timezone", "Mon,Fri *-*-1,15 09:00:00 America/New_York"},
+	}
+	for _, bc := range cases {
+		b.Run(bc.name, func(b *testing.B) {
+			for b.Loop() {
+				systemdtime.ParseCalendarEvent(bc.input)
+			}
+		})
+	}
+}
+
+func ExampleParseCalendarEvent() {
+	ev := "Mon *-*-* 09:00:00"
+	ce, _ := systemdtime.ParseCalendarEvent(ev)
+	next, _ := ce.Next(time.Date(2009, 11, 10, 23, 0, 0, 0, time.UTC))
+	fmt.Printf("%q elapses next on %s.\n", ev, next.Format("Mon 2006-01-02 15:04:05"))
+	// Output:
+	// "Mon *-*-* 09:00:00" elapses next on Mon 2009-11-16 09:00:00.
+}
+
+func TestCalendarEventNext(t *testing.T) {
+	now := time.Date(2009, 11, 10, 23, 0, 0, 0, time.UTC)
+	cases := []struct {
+		input       string
+		expect      time.Time
+		expectNever bool
+	}{
+		// keyword
+		{"minutely", time.Date(2009, 11, 10, 23, 1, 0, 0, time.UTC), false},
+		{"hourly", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"daily", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"monthly", time.Date(2009, 12, 1, 0, 0, 0, 0, time.UTC), false},
+		{"weekly", time.Date(2009, 11, 16, 0, 0, 0, 0, time.UTC), false},
+		{"yearly", time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		{"annually", time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		{"quarterly", time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		{"semiannually", time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		// date
+		{"*-*-11 00:00:00", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"*-*-10 00:00:00", time.Date(2009, 12, 10, 0, 0, 0, 0, time.UTC), false},
+		{"2009-11-11 00:00:00", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"2020..2025-*-*", time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		{"2150-01-01", time.Date(2150, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		{"*-02-25..31", time.Date(2010, 2, 25, 0, 0, 0, 0, time.UTC), false},
+		{"12-*-* 2,1:23", time.Date(2012, 1, 1, 1, 23, 0, 0, time.UTC), false},
+		{"2009-11-10 00:00:00", time.Time{}, true},
+		{"*-02-30 00:00:00", time.Time{}, true},
+		// time
+		{"08:05:40", time.Date(2009, 11, 11, 8, 5, 40, 0, time.UTC), false},
+		{"*-*-* 23:30:00", time.Date(2009, 11, 10, 23, 30, 0, 0, time.UTC), false},
+		{"*-*-* 23:00:00", time.Date(2009, 11, 11, 23, 0, 0, 0, time.UTC), false},
+		{"*-*-* 22:30:00", time.Date(2009, 11, 11, 22, 30, 0, 0, time.UTC), false},
+		{"*-*-* *:30:00", time.Date(2009, 11, 10, 23, 30, 0, 0, time.UTC), false},
+		{"*-*-* *:00:00", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"12,14,13,12:20,10,30", time.Date(2009, 11, 11, 12, 10, 0, 0, time.UTC), false},
+		{"12..14:10,20,30", time.Date(2009, 11, 11, 12, 10, 0, 0, time.UTC), false},
+		// weekday
+		{"Mon *-*-* 00:00:00", time.Date(2009, 11, 16, 0, 0, 0, 0, time.UTC), false},
+		{"Tue *-*-* 00:00:00", time.Date(2009, 11, 17, 0, 0, 0, 0, time.UTC), false},
+		{"Mon,Fri *-*-* 00:00:00", time.Date(2009, 11, 13, 0, 0, 0, 0, time.UTC), false},
+		{"Mon..Wed *-*-* 00:00:00", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"Sat,Sun 08:05:40", time.Date(2009, 11, 14, 8, 5, 40, 0, time.UTC), false},
+		{"monday *-12-* 17:00", time.Date(2009, 12, 7, 17, 0, 0, 0, time.UTC), false},
+		{"Wed *-1", time.Date(2010, 9, 1, 0, 0, 0, 0, time.UTC), false},
+		{"Wed..Sat,Tue 12-10-15 1:2:3", time.Time{}, true},
+		// last day
+		{"*-11~1 00:00:00", time.Date(2009, 11, 30, 0, 0, 0, 0, time.UTC), false},
+		{"*-11~7/1 00:00:00", time.Date(2009, 11, 24, 0, 0, 0, 0, time.UTC), false},
+		{"*-02~03 00:00:00", time.Date(2010, 2, 26, 0, 0, 0, 0, time.UTC), false},
+		{"*-*~1..3 06:00", time.Date(2009, 11, 28, 6, 0, 0, 0, time.UTC), false},
+		{"Mon *-05~07/1 00:00:00", time.Date(2010, 5, 31, 0, 0, 0, 0, time.UTC), false},
+		// range&repetition
+		{"*-*-* 0/6:00:00", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"*-*-* *:0/15:00", time.Date(2009, 11, 10, 23, 15, 0, 0, time.UTC), false},
+		{"*:2/3", time.Date(2009, 11, 10, 23, 2, 0, 0, time.UTC), false},
+		{"*:0/30", time.Date(2009, 11, 10, 23, 30, 0, 0, time.UTC), false},
+		{"mon,fri *-1/2-1,3 *:30:45", time.Date(2010, 1, 1, 0, 30, 45, 0, time.UTC), false},
+		{"Thu,Fri 2012-*-1,5 11:12:13", time.Date(2012, 1, 5, 11, 12, 13, 0, time.UTC), false},
+		// fractional
+		{"*-*-* *:*:00.5", time.Date(2009, 11, 10, 23, 0, 0, 500000000, time.UTC), false},
+		{"*-*-* *:*:00/5", time.Date(2009, 11, 10, 23, 0, 5, 0, time.UTC), false},
+		{"05:40:23.4200004/3.1700005", time.Date(2009, 11, 11, 5, 40, 23, 420000400, time.UTC), false},
+		// timezone
+		{"daily UTC", time.Date(2009, 11, 11, 0, 0, 0, 0, time.UTC), false},
+		{"daily Australia/Sydney", time.Date(2009, 11, 12, 0, 0, 0, 0, tzSydney), false},
+		{"*-*-* 00:00:00 Asia/Tokyo", time.Date(2009, 11, 12, 0, 0, 0, 0, tzTokyo), false},
+		{"*-*-* 12:00:00 +05:30", time.Date(2009, 11, 11, 6, 30, 0, 0, time.UTC), false},
+	}
+	for _, tc := range cases {
+		ce, err := systemdtime.ParseCalendarEvent(tc.input)
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", tc.input, err)
+			continue
+		}
+		got, ok := ce.Next(now)
+		if tc.expectNever {
+			if ok {
+				t.Errorf("%q: expected never, got %v", tc.input, got)
+			}
+			continue
+		}
+		if !ok {
+			t.Errorf("%q: expected %v, got never", tc.input, tc.expect)
+			continue
+		}
+		if !got.Equal(tc.expect) {
+			t.Errorf("%q: expected %v, got %v", tc.input, tc.expect, got)
+		}
+	}
+}
+
+func BenchmarkCalendarEventNext(b *testing.B) {
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"daily", "daily"},
+		{"weekly", "weekly"},
+		{"complex", "Mon,Fri *-*-1,15 09:00:00"},
+		{"lastday", "*-*~1 00:00:00"},
+		{"fractional", "*-*-* *:*:00.5"},
+	}
+	now := time.Date(2009, 11, 10, 23, 0, 0, 0, time.UTC)
+	for _, bc := range cases {
+		ce, _ := systemdtime.ParseCalendarEvent(bc.input)
+		b.Run(bc.name, func(b *testing.B) {
+			for b.Loop() {
+				ce.Next(now)
+			}
+		})
+	}
 }

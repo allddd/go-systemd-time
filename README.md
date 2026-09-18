@@ -2,9 +2,6 @@
 
 Go implementation of [systemd time](https://www.freedesktop.org/software/systemd/man/latest/systemd.time.html).
 
-> [!note]
-> Calendar events are not yet supported.
-
 I don't like maintaining docs in two places, so below are just a few examples and the rest is on [pkg.go.dev](https://pkg.go.dev/gitlab.com/allddd/go-systemd-time).
 
 ## Time spans
@@ -16,7 +13,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	systemdtime "gitlab.com/allddd/go-systemd-time"
 )
@@ -34,7 +30,8 @@ func main() {
 	for _, ts := range timespans {
 		d, err := systemdtime.ParseTimespan(ts)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			continue
 		}
 		fmt.Printf("There are %.0f seconds in %q.\n", d.Seconds(), ts)
 	}
@@ -50,7 +47,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	systemdtime "gitlab.com/allddd/go-systemd-time"
 )
@@ -68,9 +64,50 @@ func main() {
 	for _, ts := range timestamps {
 		t, err := systemdtime.ParseTimestamp(ts)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			continue
 		}
 		fmt.Printf("%q is a %s.\n", ts, t.Weekday())
+	}
+}
+```
+
+## Calendar events
+
+`ParseCalendarEvent` parses a calendar event string and returns a `CalendarEvent`. Its `Next` method returns the next time the event matches. It supports weekdays, wildcards, lists, ranges, repetitions, days counted from the end of the month, shorthands, etc. See the [full docs](https://pkg.go.dev/gitlab.com/allddd/go-systemd-time#ParseCalendarEvent) for more info.
+
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+
+	systemdtime "gitlab.com/allddd/go-systemd-time"
+)
+
+func main() {
+	events := []string{
+		"daily",
+		"Mon..Fri 09:00",
+		"*-*-01 12:00:00",
+		"*-*~1 23:59",
+		"Thu,Fri *-*-1,5 11:12:13",
+		"weekly Asia/Tokyo",
+		"*:0/15",
+	}
+	for _, ev := range events {
+		ce, err := systemdtime.ParseCalendarEvent(ev)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		next, ok := ce.Next(time.Now())
+		if !ok {
+			fmt.Printf("%q never elapses again.\n", ev)
+			continue
+		}
+		fmt.Printf("%q elapses next on %s.\n", ev, next.Format("Mon 2006-01-02 15:04:05"))
 	}
 }
 ```
