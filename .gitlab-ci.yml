@@ -18,7 +18,7 @@ lint:
 test:
     stage: check
     script:
-        - go test -fullpath -shuffle=on ./...
+        - go test -fullpath -mod=readonly -timeout=10s -shuffle=on ./...
 
 publish:
     stage: publish
