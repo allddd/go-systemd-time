@@ -33,7 +33,7 @@ func main() {
 			fmt.Println(err)
 			continue
 		}
-		fmt.Printf("There are %.0f seconds in %q.\n", d.Seconds(), ts)
+		fmt.Printf("%q is %.0f seconds.\n", ts, d.Seconds())
 	}
 }
 ```
